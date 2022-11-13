@@ -27,15 +27,8 @@ class PicoUnicoApp(object):
         pass
 
     def _draw_ui(self):
-        pass
-
-    async def _button_listener_process(self):
-        while self.active:
-            #print('BL', self.__class__.__name__)
-            for button in self.button_layout:
-                if picounicorn.is_pressed(button['button'].btn):
-                    await button['action'][0](*button['action'][1])
-            await uasyncio.sleep(self.button_listener_frequency)
+        for button in self.button_layout:
+            ui.draw_button_sign(button['button'], button['colour'])
 
     async def _screen_renderer_process(self):
         while self.active:
@@ -47,14 +40,30 @@ class PicoUnicoApp(object):
             else:
                 await uasyncio.sleep(self.screen_renderer_frequency)
 
+    async def _button_listener_process(self):
+        while self.active:
+            #print('BL', self.__class__.__name__)
+            for button in self.button_layout:
+                if picounicorn.is_pressed(button['button'].btn):
+                    if button['action']:
+                        fn = button['action'][0]
+                        params = button['action'][1]
+                        if params:
+                            await fn(*params)
+                        else:
+                            await fn()
+                    else:
+                        pass
+            await uasyncio.sleep(self.button_listener_frequency)
+
 
 class PicoUnicoAppMain(PicoUnicoApp):
     def __init__(self, is_switched_to=False):
         self.button_layout = [
-            {'button': ui.BUTTON_A, 'action': (switch_app, [PicoUnicoAppStandBy, self]), 'colour': 'red'},
-            {'button': ui.BUTTON_B, 'action': (switch_app, [PicoUnicoAppStandBy, self]), 'colour': 'red'},
+            {'button': ui.BUTTON_A, 'action': (switch_app, [PicoUnicoAppTorch, self]), 'colour': 'white'},
+            {'button': ui.BUTTON_B, 'action': (switch_app, [PicoUnicoAppTorch, self]), 'colour': 'white'},
             {'button': ui.BUTTON_X, 'action': (switch_app, [PicoUnicoAppStandBy, self]), 'colour': 'red'},
-            {'button': ui.BUTTON_Y, 'action': (switch_app, [PicoUnicoAppStandBy, self]), 'colour': 'red'},
+            {'button': ui.BUTTON_Y, 'action': (switch_app, [PicoUnicoAppTorch, self]), 'colour': 'white'},
         ]
         self.button_listener_frequency = 0.1
         self.screen_renderer_frequency = 0.1
@@ -64,10 +73,6 @@ class PicoUnicoAppMain(PicoUnicoApp):
         picounicorn.clear()
         picounicorn.set_pixel_value(3, 3, 5)
         picounicorn.set_pixel_value(3, 4, 20)
-
-    def _draw_ui(self):
-        for button in self.button_layout:
-            ui.draw_button_sign(button['button'], button['colour'])
 
 
 class PicoUnicoAppStandBy(PicoUnicoApp):
@@ -82,6 +87,34 @@ class PicoUnicoAppStandBy(PicoUnicoApp):
     def _draw_ui(self):
         picounicorn.clear()
         picounicorn.set_pixel(15, 0, 30, 0, 0)
+
+
+class PicoUnicoAppTorch(PicoUnicoApp):
+    def __init__(self, is_switched_to=False):
+        self.button_layout = [
+            {'button': ui.BUTTON_A, 'action': (self._raise_torch_brightness, None), 'colour': 'blue'},
+            {'button': ui.BUTTON_B, 'action': (self._lower_torch_brightness, None), 'colour': 'blue'},
+            {'button': ui.BUTTON_X, 'action': (switch_app, [PicoUnicoAppMain, self]), 'colour': 'red'},
+        ]
+        self.button_listener_frequency = 0.1
+        self.screen_renderer_frequency = 1
+        self.torch_brightness = 255
+        super().__init__(is_switched_to)
+
+    def _draw_screen(self):
+        for x in range(0, 16):
+            for y in range(0, 7):
+                picounicorn.set_pixel_value(x, y, self.torch_brightness)
+
+    async def _raise_torch_brightness(self):
+        self.torch_brightness += 5
+        if self.torch_brightness >= 255:
+            self.torch_brightness = 255
+
+    async def _lower_torch_brightness(self):
+        self.torch_brightness -= 5
+        if self.torch_brightness <= 10:
+            self.torch_brightness = 10
 
 
 if __name__ == "__main__":
